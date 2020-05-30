@@ -5,11 +5,12 @@
 	<script type="text/javascript"
 		src="https://cdnjs.cloudflare.com/ajax/libs/mootools/1.6.0/mootools-core.js"></script>
 	<script type="text/javascript">
-		var canvas, ctx, balls, idTimer, curentDirection = 'up';
-		TBall = new Class({
+		var canvas, ctx, figures, idTimerMove, idTimerSize, curentDirection = 'up';
+		var flag = false;
+		Figures = new Class({
 			initialize: function (pX, pY) {
-				this.posX = pX; //позиция шарика по X
-				this.posY = pY; //позиция шарика по Y
+				this.posX = pX;
+				this.posY = pY;
 				if (curentDirection == 'random') {
 					q = Math.random();
 					if ((q >= 0) && (q < 0.25))
@@ -23,137 +24,207 @@
 				}
 				else
 					this.direction = curentDirection;
-				//цвет шарика, формируется случайным оьразом
-				this.colBall = 'rgb(' + Math.floor(Math.random() * 256) + ','
-					+ Math.floor(Math.random() * 256) + ',' + Math.floor(Math.random() * 256) + ')';
-				// радиус шарика, случайное число от 5 до 30
-				this.rBall = 5 + Math.random() * 25;
+				this.colour = 'rgb(' + Math.floor(Math.random() * 256) + ',' + Math.floor(Math.random() * 256) + ',' + Math.floor(Math.random() * 256) + ')';
 			},
 			posX: 0,
 			posY: 0,
-			direction: "up", // моё поле, отвечающее за направление 
-			colBall: "rgb(0,0,0)",
-			rBall: 0,
+			direction: "up",
+			colour: "rgb(0,0,0)",
+		});
+		TBall = new Class({
+			Extends: Figures,
+			initialize: function (pX, pY) {
+				this.parent(pX, pY);
+				this.size = 5 + Math.random() * 25;
+			},
+			size: 0,
 			colorBall: function (ctx) {
-				// формируем градиентную заливку для шарика
 				with (this) {
-					var gradient = ctx.createRadialGradient(posX + rBall / 4,
-						posY - rBall / 6, rBall / 8, posX, posY, rBall);
+					var gradient = ctx.createRadialGradient(posX - 8 + size / 4, posY - 8 - size / 6, size / 8, posX - 8, posY - 8, size);
 					gradient.addColorStop(0, '#fff');
-					gradient.addColorStop(0.85, colBall);
+					gradient.addColorStop(0.85, colour);
 					return gradient;
 				}
 			},
 			draw: function (ctx) {
-				// рисуем шарик на canvas
 				with (this) {
 					ctx.fillStyle = colorBall(ctx);
 					ctx.beginPath();
-					ctx.arc(posX, posY, rBall, 0, 2 * Math.PI, false);
+					ctx.arc(posX - 8, posY - 8, size, 0, 2 * Math.PI, false);
 					ctx.closePath();
 					ctx.fill();
 				}
 			}
 		});
+		Rectangle = new Class({
+			Extends: Figures,
+			initialize: function (pX, pY) {
+				this.parent(pX, pY);
+				this.h = 25 + Math.random() * 50;
+				this.w = 25 + Math.random() * 50;
+			},
+			h: 0,
+			w: 0,
+			colorRectangle: function (ctx) {
+				with (this) {
+					var gradient = ctx.createLinearGradient(posX - .5 * h - 8, posY - .5 * w - 8, posX + w, posY + h);
+					gradient.addColorStop(0, '#fff');
+					gradient.addColorStop(0.7, colour);
+					return gradient;
+				}
+			},
+			draw: function (ctx) {
+				with (this) {
+					ctx.fillStyle = this.colorRectangle(ctx);
+					ctx.fillRect(posX - .5 * h - 8, posY - 0.5 * w - 8, h, w);
+				}
+			}
+		});
+		Triangle = new Class({
+			Extends: Figures,
+			initialize: function (pX, pY) {
+				this.parent(pX, pY);
+				this.base = 25 + Math.random() * 50;
+			},
+			base: 0,
+			colorTriangle: function (ctx) {
+				with (this) {
+					var gradient = ctx.createLinearGradient(posX - 8, posY - 0.5 * 0.87 * base - 8, posX - 8, posY + 0.5 * 0.87 * base - 8);
+					gradient.addColorStop(0, '#fff');
+					gradient.addColorStop(0.7, colour);
+					return gradient;
+				}
+			},
+			draw: function (ctx) {
+				with (this) {
+					ctx.fillStyle = this.colorTriangle(ctx);
+					ctx.beginPath();
+					ctx.moveTo(posX - 0.5 * base - 8, posY + 0.5 * 0.87 * base - 8);
+					ctx.lineTo(posX + 0.5 * base - 8, posY + 0.5 * 0.87 * base - 8);
+					ctx.lineTo(posX - 8, posY - 0.5 * 0.87 * base - 8);
+					ctx.fill();
+				}
+			}
+		});
+		// закрашиваем канвас градиентным фоном
 		function drawBack(ctx, col1, col2, w, h) {
-			// закрашиваем канвас градиентным фоном
-			///ctx.save();
+			ctx.save();
 			var g = ctx.createLinearGradient(0, 0, 0, h);
 			g.addColorStop(0, col1);
-			g.addColorStop(0.5, 'rgb(55, 103, 236)');
 			g.addColorStop(1, col2);
 			ctx.fillStyle = g;
 			ctx.fillRect(0, 0, w, h);
-			///ctx.restore();
+			ctx.restore();
 		}
 		// инициализация работы
 		function init() {
 			canvas = document.getElementById('canvas');
 			if (canvas.getContext) {
 				ctx = canvas.getContext('2d');
-				//рисуем фон
 				drawBack(ctx, '#202020', '#aaa', canvas.width, canvas.height);
-				//создаем 10 шариков, заноси их в массив и выводим на canvas
-				balls = [];
+				figures = [];
 				for (var i = 1; i <= 10; i++) {
-					var item = new TBall(10 + Math.random() * (canvas.width - 30),
+					creationFigure(10 + Math.random() * (canvas.width - 30),
 						10 + Math.random() * (canvas.height - 30));
-					item.draw(ctx);
-					balls.push(item);
 				}
 			}
 		}
-		// создаем новый шарик по щелчку мыши, добавляем его в массив шариков и рисуем его
-		function goInput(event) {
-			var x = event.clientX;
-			var y = event.clientY;
-			var item = new TBall(x, y);
+		// создаем новую фигуру по щелчку мыши, добавляем её в массив фигур и рисуем её
+		function creationFigure(x, y) {
+			q = Math.random() * 3;
+			if ((q >= 0) && (q < 1))
+				var item = new TBall(x, y);
+			if ((q >= 1) && (q < 2))
+				var item = new Rectangle(x, y);
+			if ((q >= 2) && (q < 3))
+				var item = new Triangle(x, y);
 			item.draw(ctx);
-			balls.push(item);
+			figures.push(item);
+		}
+		function increaseSize() {
+			drawBack(ctx, '#202020', '#aaa', canvas.width, canvas.height);
+			figures.forEach((element, i) => {
+				if (element instanceof TBall) {
+					element.size += 0.2;
+					if (element.size > 50)
+						figures.splice(i, 1);
+				}
+				if (element instanceof Triangle) {
+					element.base += 0.4;
+					if (element.base > 100)
+						figures.splice(i, 1);
+				}
+				if (element instanceof Rectangle) {
+					element.h += 0.4;
+					element.w += 0.4;
+					if (Math.sqrt(element.h * element.h + element.w * element.w) > 150)
+						figures.splice(i, 1);
+				}
+				element.draw(ctx);
+			});
 		}
 		function moveBall() {
-			//реализация движения шариков, находящихся в массиве balls
 			drawBack(ctx, '#202020', '#aaa', canvas.width, canvas.height);
-			for (var i = 0; i < balls.length; i) {
-				switch (balls[i].direction) {
+			for (var i = 0; i < figures.length; i) {
+				switch (figures[i].direction) {
 					case 'up':
-						balls[i].posX = balls[i].posX + (Math.random() * 4 - 2);
-						balls[i].posY = balls[i].posY + (Math.random() * 2 - 4);
+						figures[i].posX = figures[i].posX + (Math.random() * 2 - 1);
+						figures[i].posY = figures[i].posY + (Math.random() * 1 - 2);
 						break;
 					case 'down':
-						balls[i].posX = balls[i].posX + (Math.random() * 4 - 2);
-						balls[i].posY = balls[i].posY - (Math.random() * 2 - 4);
+						figures[i].posX = figures[i].posX + (Math.random() * 2 - 1);
+						figures[i].posY = figures[i].posY - (Math.random() * 1 - 2);
 						break;
 					case 'left':
-						balls[i].posX = balls[i].posX + (Math.random() * 2 - 4);
-						balls[i].posY = balls[i].posY + (Math.random() * 4 - 2);
+						figures[i].posX = figures[i].posX + (Math.random() * 1 - 2);
+						figures[i].posY = figures[i].posY + (Math.random() * 2 - 1);
 						break;
 					case 'right':
-						balls[i].posX = balls[i].posX - (Math.random() * 2 - 4);
-						balls[i].posY = balls[i].posY + (Math.random() * 4 - 2);
+						figures[i].posX = figures[i].posX - (Math.random() * 1 - 2);
+						figures[i].posY = figures[i].posY + (Math.random() * 2 - 1);
 						break;
-						case 'chaos':
-						balls[i].posX = balls[i].posX + (Math.random() * 4 - 2);
-						balls[i].posY = balls[i].posY + (Math.random() * 4 - 2);
+					case 'chaos':
+						figures[i].posX = figures[i].posX + (Math.random() * 2 - 1);
+						figures[i].posY = figures[i].posY + (Math.random() * 2 - 1);
 						break;
 				}
-				balls[i].draw(ctx);
-				if ((balls[i].posX > canvas.width) || (balls[i].posX < 0) || (balls[i].posY < 0) || (balls[i].posY > canvas.height))
-					balls.splice(i, 1);
+				figures[i].draw(ctx);
+				if ((figures[i].posX > canvas.width) || (figures[i].posX < 0) || (figures[i].posY < 0) || (figures[i].posY > canvas.height))
+					figures.splice(i, 1);
 				else
 					i++;
 			}
 		}
 		function move(dir) {
-			if ((curentDirection != dir) || (!idTimer)) {
+			if ((curentDirection != dir) || (!idTimerMove)) {
 				switch (dir) {
 					case 'up':
-						balls.forEach(element => {
+						figures.forEach(element => {
 							element.direction = 'up';
 						});
 						break;
 					case 'down':
-						balls.forEach(element => {
+						figures.forEach(element => {
 							element.direction = 'down';
 						});
 						break;
 					case 'left':
-						balls.forEach(element => {
+						figures.forEach(element => {
 							element.direction = 'left';
 						});
 						break;
 					case 'right':
-						balls.forEach(element => {
+						figures.forEach(element => {
 							element.direction = 'right';
 						});
 						break;
-						case 'chaos':
-						balls.forEach(element => {
+					case 'chaos':
+						figures.forEach(element => {
 							element.direction = 'chaos';
 						});
 						break;
 					case 'random':
-						balls.forEach(element => {
+						figures.forEach(element => {
 							var q = Math.random();
 							if ((q >= 0) && (q < 0.25))
 								element.direction = 'up';
@@ -166,29 +237,45 @@
 						});
 						break;
 				}
-				stop();
-				idTimer = setInterval(moveBall, 50);
+				stopMove();
+				if (document.getElementById('speed').value != 0)
+					idTimerMove = setInterval(moveBall, 100 / document.getElementById('speed').value);
 				curentDirection = dir;
+				flag = true;
 			}
 		}
-		function stop() {
-			clearInterval(idTimer);
-			idTimer = false;
+		function stopMove() {
+			clearInterval(idTimerMove);
+			idTimerMove = false;
+			flag = false;
+		}
+		function startIncrease() {
+			if (!idTimerSize)
+				idTimerSize = setInterval('increaseSize();', 50);
+		}
+		function stopIncrease() {
+			clearInterval(idTimerSize);
+			idTimerSize = false;
+		}
+		function forSpeed() {
+			if (flag) {
+				stopMove();
+				move(curentDirection)
+			}
 		}
 	</script>
 	<style type="text/css">
 		canvas {
-			border: 1px solid rgb(55, 103, 236);
+			border: 1px solid rgb(48, 44, 49);
 		}
 	</style>
 </head>
 
 <body onload="init();">
-	<canvas id="canvas" width="600" height="400" onclick="goInput(event);">
+	<canvas id="canvas" width="600" height="400" onclick="creationFigure(event.pageX,event.pageY);">
 	</canvas>
 	<br>
 	<br>
-
 	<form>
 		<input type="button" value="Вверх" onclick="move('up')">
 		<input type="button" value="Вниз" onclick="move('down')">
@@ -196,7 +283,13 @@
 		<input type="button" value="Вправо" onclick="move('right')">
 		<input type="button" value="Рандом" onclick="move('random')">
 		<input type="button" value="Хаос" onclick="move('chaos')"> <br> <br>
-		<input type="button" value="Стоп" onclick="stop()">
+		<input type="button" value="Стоп" onclick="stopMove()">
+		<h3>Увеличение размера</h3>
+		<input type="radio" name="increase" id="increase1" onclick="startIncrease()"><label
+			for="increase1">Да</label><br>
+		<input type="radio" name="increase" id="increase2" onclick="stopIncrease()"><label for="increase2">Нет</label>
+		<h3>Скорость</h3>
+		<input type="range" name="speed" id="speed" min="0" max="10" onclick="forSpeed()">
 	</form>
 </body>
 
